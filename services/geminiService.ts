@@ -13,6 +13,43 @@ const modelConfig = {
     model: 'gemini-2.5-flash',
 };
 
+export const generateChatResponseStream = async (
+    history: Message[], 
+    newMessage: string, 
+    knowledgeBase: string,
+    onChunk: (text: string) => void
+) => {
+    try {
+        const chatHistory = history.map(msg => ({
+            role: msg.role === MessageRole.USER ? 'user' : 'model',
+            parts: [{ text: msg.text }]
+        }));
+
+        // Usamos generateContentStream en lugar de generateContent
+        const responseStream = await ai.models.generateContentStream({
+            ...modelConfig,
+            contents: [...chatHistory, { role: 'user', parts: [{ text: newMessage }] }],
+            config: {
+                systemInstruction: `${systemInstruction}\n\n[BASE DE CONOCIMIENTO REGLADA]\n${knowledgeBase}`,
+                safetySettings,
+            }
+        });
+
+        let fullText = '';
+        for await (const chunk of responseStream) {
+            if (chunk.text) {
+                fullText += chunk.text;
+                onChunk(fullText); // Envía los fragmentos a la interfaz en tiempo real
+            }
+        }
+
+        return fullText;
+    } catch (error) {
+        console.error("Error en streaming:", error);
+        return "Disculpe, ocurrió un error. Por favor intente de nuevo.";
+    }
+};
+
 // FIX: Removed escaped backticks from the template literal to prevent parsing errors.
 const systemInstruction = `
 Rol y Configuración Base
