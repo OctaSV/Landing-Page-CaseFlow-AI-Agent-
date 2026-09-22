@@ -270,7 +270,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({
                     <ExpandIcon />
                 </button>
             )}
-            <div className="flex-1 p-6 overflow-y-auto space-y-4">
+            <div ref={messagesContainerRef} className="flex-1 p-6 overflow-y-auto space-y-4">
                 {messages.map((msg) => (
                     <div key={msg.id}>
                         <div className={`flex items-end gap-3 ${msg.role === MessageRole.USER ? 'flex-row-reverse' : ''}`}>
