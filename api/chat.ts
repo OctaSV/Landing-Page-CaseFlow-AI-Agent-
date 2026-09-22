@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, HarmCategory, HarmBlockThreshold } from "@google/genai";
 
 const systemInstruction = `
 Rol y Configuración Base
@@ -56,7 +56,7 @@ A (Aseguradora): Identificación y solvencia de la aseguradora del responsable
 C (Completitud): Nivel de documentación disponible
 E (Económica): Estimación del valor indemnizatorio potencial
 
-IMPORTANTE: Recopila esta información de forma conversacional y natural. No menciones explícitamente estas variables al usuario. El sistema backend extraerá automáticamente estos datos del historial de conversación para calcular el scoring.
+IMPORTANTE: Recopila esta información de forma conversacional y natural. No menciones explíciamente estas variables al usuario. El sistema backend extraerá automáticamente estos datos del historial de conversación para calcular el scoring.
 
 Validación y Manejo de Datos
 Datos Inválidos o Imposibles
@@ -76,10 +76,10 @@ FASE 3: Veredicto y Armado de Expediente Digital
 `;
 
 const safetySettings = [
-  { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
-  { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
-  { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
-  { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
+  { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+  { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
+  { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
+  { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
 ];
 
 // Modelos activos y estables de la serie Gemini 3
@@ -119,12 +119,11 @@ export default async function handler(req: any, res: any) {
       parts: [{ text: msg.text || '' }]
     }));
 
-    // Construcción del Prompt: Se instruye explícitamente a mantener el flujo de diálogo si el usuario saluda o no aporta detalles
     let userPrompt = newMessage;
     if (knowledgeBase && knowledgeBase.trim().length > 0) {
       userPrompt = `Usa la siguiente base de conocimiento como referencia para tus respuestas:\n\n--- INICIO BASE DE CONOCIMIENTO ---\n${knowledgeBase}\n--- FIN BASE DE CONOCIMIENTO ---\n\nInstrucciones adicionales para la respuesta:
 1. Si el usuario te saluda, te responde de forma breve o te plantea una duda general sobre un accidente, mantén tu rol de Cassey: saluda empáticamente y hazle preguntas una a una para ir entendiendo su situación.
-2. Si el usuario realiza una pregunta técnica o normativa puntual y la respuesta NO se encuentra en la base de conocimiento ni en tus leyes de referencia, responde estrictamente "[KNOWLEDGE_BASE_FALLBACK]".
+2. Si el usuario realiza una pregunta técnica o normativa puntual y la respuesta NO se encuentra en la base de conocimiento ni en tus leyes de referencia, responde strictly "[KNOWLEDGE_BASE_FALLBACK]".
 
 Mensaje del usuario: "${newMessage}"`;
     }
@@ -137,7 +136,6 @@ Mensaje del usuario: "${newMessage}"`;
     let response = null;
     let lastError = null;
 
-    // Reintentos automáticos y fallback entre modelos de la API
     for (const modelName of CANDIDATE_MODELS) {
       for (let attempt = 1; attempt <= 2; attempt++) {
         try {
