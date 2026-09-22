@@ -53,7 +53,7 @@ A (Aseguradora): Identificación y solvencia de la aseguradora del responsable
 C (Completitud): Nivel de documentación disponible
 E (Económica): Estimación del valor indemnizatorio potencial
 
-IMPORTANTE: Recopila esta información de forma conversacional y natural. No menciones explícitamente estas variables al usuario. El sistema backend extraerá automáticamente estos datos del historial de conversación para calcular el scoring.
+IMPORTANTE: Recopila esta información de forma conversacional y natural. No menciones explitamente estas variables al usuario. El sistema backend extraerá automáticamente estos datos del historial de conversación para calcular el scoring.
 
 Validación y Manejo de Datos
 Datos Inválidos o Imposibles
@@ -79,6 +79,9 @@ const safetySettings = [
   { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
 ];
 
+// Lista de modelos ordenada por preferencia
+const CANDIDATE_MODELS = ['gemini-3.6-flash', 'gemini-1.5-flash', 'gemini-2.0-flash'];
+
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Método no permitido' });
@@ -92,10 +95,8 @@ export default async function handler(req: any, res: any) {
 
   try {
     const { history = [], newMessage = '', knowledgeBase = '' } = req.body;
-
     const ai = new GoogleGenAI({ apiKey });
 
-    // Limpieza del historial para prevenir duplicidad del rol 'user' al final
     const rawHistory = Array.isArray(history) ? history : [];
     let previousHistory = rawHistory;
 
@@ -119,18 +120,36 @@ export default async function handler(req: any, res: any) {
       { role: 'user', parts: [{ text: augmentedPrompt }] }
     ];
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.6-flash',
-      contents,
-      config: {
-        systemInstruction,
-        safetySettings,
-      }
-    });
+    let response = null;
+    let lastError = null;
 
-    return res.status(200).json({ text: response.text || '' });
+    // Bucle de intento con fallback
+    for (const modelName of CANDIDATE_MODELS) {
+      try {
+        response = await ai.models.generateContent({
+          model: modelName,
+          contents,
+          config: {
+            systemInstruction,
+            safetySettings,
+          }
+        });
+        if (response?.text) {
+          break; // Si el modelo respondió con éxito, salimos del bucle
+        }
+      } catch (err: any) {
+        console.warn(`El modelo ${modelName} falló con error (${err.message || err}). Intentando siguiente fallback...`);
+        lastError = err;
+      }
+    }
+
+    if (!response || !response.text) {
+      throw lastError || new Error("Ningún modelo de Gemini estuvo disponible.");
+    }
+
+    return res.status(200).json({ text: response.text });
   } catch (error: any) {
-    console.error("Error en /api/chat:", error);
+    console.error("Error en /api/chat tras intentar fallbacks:", error);
     return res.status(500).json({ error: error.message || "Error interno del servidor" });
   }
 }
