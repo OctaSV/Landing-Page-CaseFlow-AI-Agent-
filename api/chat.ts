@@ -80,7 +80,11 @@ const safetySettings = [
 ];
 
 // Lista de modelos ordenada por preferencia
-const CANDIDATE_MODELS = ['gemini-3.6-flash', 'gemini-1.5-flash', 'gemini-2.0-flash'];
+const CANDIDATE_MODELS = [
+  'gemini-3.6-flash',
+  'gemini-2.0-flash',
+  'gemini-2.0-flash-lite'
+];
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {
