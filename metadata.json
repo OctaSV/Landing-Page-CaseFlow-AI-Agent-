@@ -1,0 +1,8 @@
+{
+  "name": "Landing Page CaseFlow (AI Agent)",
+  "description": "",
+  "requestFramePermissions": [
+    "geolocation"
+  ],
+  "majorCapabilities": []
+}
