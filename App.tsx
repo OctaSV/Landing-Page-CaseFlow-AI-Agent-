@@ -286,11 +286,10 @@ const App: React.FC = () => {
     }
 
     return (
-        <div className="min-h-screen text-text-muted font-sans antialiased relative">
-            <div className="absolute inset-0 z-[-1]">
-                <div className="absolute top-1/2 left-1/2 w-96 h-96 bg-primary/5 rounded-full filter blur-3xl animate-pulse"></div>
+        <div className="min-h-screen text-text-muted font-sans antialiased relative overflow-x-hidden w-full">
+            <div className="absolute inset-0 z-[-1] overflow-hidden pointer-events-none">
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-primary/5 rounded-full filter blur-3xl animate-pulse"></div>
             </div>
-            
             <header className="fixed top-0 left-0 right-0 z-50 h-16 bg-background/80 backdrop-blur-md border-b border-card/80">
                 <div className="container mx-auto flex justify-between items-center h-full px-6">
                     <div className="flex-shrink-0 text-2xl font-bold text-text-main">
@@ -319,7 +318,7 @@ const App: React.FC = () => {
                         </AnimatedSection>
                         
                         <AnimatedSection className="w-full max-w-6xl mx-auto">
-                            <div className="h-[70vh] max-h-[700px] bg-card/50 backdrop-blur-md rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-card-border/60">
+                            <div className="h-[460px] sm:h-[480px] lg:h-[450px] max-h-[480px] bg-card/50 backdrop-blur-md rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-card-border/60">
                                 <Chatbot
                                     knowledgeBase={combinedKnowledgeBase}
                                     messages={activeChat.messages}
