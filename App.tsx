@@ -251,6 +251,16 @@ const App: React.FC = () => {
         setActiveChatId(newChatId);
     };
 
+    const closeFullScreenChat = () => {
+          setIsFullScreenChat(false);
+      };
+  
+      useEffect(() => {
+          if (!isFullScreenChat) {
+              window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+          }
+      }, [isFullScreenChat]);
+
     const combinedKnowledgeBase = `
       ${leyDeTransitoText}
       ${leyDeSegurosText}
@@ -299,12 +309,12 @@ const App: React.FC = () => {
             </header>
 
             <main>
-                <section id="hero" className="min-h-screen flex flex-col items-center justify-center p-4 pt-20">
-                    <div className="container mx-auto flex flex-col items-center text-center">
-                        <AnimatedSection className="w-full max-w-4xl">
-                            <h1 className="text-5xl md:text-6xl font-bold mb-4 mt-[30px] bg-gradient-to-r from-text-main via-primary to-text-main bg-clip-text text-transparent">
-                                ¿Tuviste un accidente de tránsito?
-                            </h1>
+                <section id="hero" className="min-h-screen flex flex-col items-center justify-start p-4 pt-24 pb-16">
+                  <div className="container mx-auto flex flex-col items-center text-center">
+                      <AnimatedSection className="w-full max-w-4xl">
+                          <h1 className="text-5xl md:text-6xl font-bold mb-4 mt-2 bg-gradient-to-r from-text-main via-primary to-text-main bg-clip-text text-transparent">
+                              ¿Tuviste un accidente de tránsito?
+                          </h1>
                             <p className="text-lg md:text-xl text-text-muted mb-12 animate-fade-in" style={{ animationDelay: '0.2s' }}>
                                 Te guiamos gratis y en minutos para que sepas qué hacer.
                                 <br />
