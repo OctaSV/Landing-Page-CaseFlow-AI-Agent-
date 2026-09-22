@@ -1,7 +1,7 @@
 import { GoogleGenAI, GenerateContentResponse, GroundingChunk, HarmCategory, HarmBlockThreshold } from "@google/genai";
 import { Message, MessageRole, GroundingSource } from '../types';
 
-const API_KEY = process.env.API_KEY;
+const apiKey = import.meta.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY || '';
 
 if (!API_KEY) {
     throw new Error("API_KEY environment variable not set.");
