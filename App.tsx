@@ -231,10 +231,6 @@ const App: React.FC = () => {
     const handleFirstMessage = () => {
         setIsFullScreenChat(true);
     };
-
-    const closeFullScreenChat = () => {
-        setIsFullScreenChat(false);
-    }
     
     const handleNewChat = () => {
         const newChatId = `chat-${Date.now()}`;
