@@ -1,9 +1,10 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, GenerateContentResponse, GroundingChunk } from "@google/genai";
+import { Message, MessageRole, GroundingSource } from '../types';
 
 const apiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
 
 if (!apiKey) {
-    console.warn("Falta configurar la variable VITE_GEMINI_API_KEY en Vercel.");
+    console.warn("VITE_GEMINI_API_KEY environment variable not set.");
 }
 
 const ai = new GoogleGenAI({ apiKey });
