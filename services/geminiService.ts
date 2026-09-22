@@ -1,52 +1,32 @@
-import { GoogleGenAI, GenerateContentResponse, GroundingChunk } from "@google/genai";
-import { Message, MessageRole, GroundingSource } from '../types';
+import { Message } from '../types';
 
-const apiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
-
-if (!apiKey) {
-    console.warn("VITE_GEMINI_API_KEY environment variable not set.");
-}
-
-const ai = new GoogleGenAI({ apiKey });
-
-const modelConfig = {
-    model: 'gemini-2.5-flash',
-};
-
-export const generateChatResponseStream = async (
+export const generateChatResponse = async (
     history: Message[], 
     newMessage: string, 
-    knowledgeBase: string,
-    onChunk: (text: string) => void
-) => {
+    knowledgeBase: string
+): Promise<{ text: string; analyzedVariable: string | null; indemnificationEvent: 'start' | 'step' | 'end' | null; }> => {
     try {
-        const chatHistory = history.map(msg => ({
-            role: msg.role === MessageRole.USER ? 'user' : 'model',
-            parts: [{ text: msg.text }]
-        }));
-
-        // Usamos generateContentStream en lugar de generateContent
-        const responseStream = await ai.models.generateContentStream({
-            ...modelConfig,
-            contents: [...chatHistory, { role: 'user', parts: [{ text: newMessage }] }],
-            config: {
-                systemInstruction: `${systemInstruction}\n\n[BASE DE CONOCIMIENTO REGLADA]\n${knowledgeBase}`,
-                safetySettings,
-            }
+        const response = await fetch('/api/chat', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ history, newMessage, knowledgeBase }),
         });
 
-        let fullText = '';
-        for await (const chunk of responseStream) {
-            if (chunk.text) {
-                fullText += chunk.text;
-                onChunk(fullText); // Envía los fragmentos a la interfaz en tiempo real
-            }
+        if (!response.ok) {
+            throw new Error(`Error en el servidor backend: ${response.statusText}`);
         }
 
-        return fullText;
+        const data = await response.json();
+        return { text: data.text, analyzedVariable: null, indemnificationEvent: null };
     } catch (error) {
-        console.error("Error en streaming:", error);
-        return "Disculpe, ocurrió un error. Por favor intente de nuevo.";
+        console.error("Error llamando a la API del servidor:", error);
+        return { 
+            text: "Disculpe, ocurrió un error al procesar su consulta. Por favor intente de nuevo.", 
+            analyzedVariable: null, 
+            indemnificationEvent: null 
+        };
     }
 };
 
