@@ -98,7 +98,7 @@ export default async function handler(req: any, res: any) {
         const augmentedPrompt = `Utilizando ÚNICAMENTE la siguiente base de conocimiento, responde a la pregunta del usuario. No inventes información. Si la respuesta no se encuentra en la base de conocimiento, responde ÚNICA Y EXCLUSIVAMENTE con el texto "[KNOWLEDGE_BASE_FALLBACK]". No añadas ninguna otra palabra o explicación.\n\n--- INICIO BASE DE CONOCIMIENTO ---\n\n${knowledgeBase}\n\n--- FIN BASE DE CONOCIMIENTO ---\n\nPregunta del usuario: "${newMessage}"`;
 
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+            model: 'gemini-3.6-flash',
             contents: [...chatHistory, { role: 'user', parts: [{ text: augmentedPrompt }] }],
             config: {
                 systemInstruction,
