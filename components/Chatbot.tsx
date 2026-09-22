@@ -260,7 +260,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({
     };
 
     return (
-        <div className="bg-transparent w-full h-full flex flex-col font-sans relative">
+        <div className="bg-transparent w-full max-w-full h-full flex flex-col font-sans relative overflow-x-hidden">
              {showExpandButton && onExpand && (
                 <button
                     onClick={onExpand}
@@ -270,7 +270,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({
                     <ExpandIcon />
                 </button>
             )}
-            <div ref={messagesContainerRef} className="flex-1 p-6 overflow-y-auto space-y-4">
+            <div ref={messagesContainerRef} className="flex-1 p-4 sm:p-6 overflow-y-auto overflow-x-hidden space-y-4">
                 {messages.map((msg) => (
                     <div key={msg.id}>
                         <div className={`flex items-end gap-3 ${msg.role === MessageRole.USER ? 'flex-row-reverse' : ''}`}>
@@ -302,12 +302,12 @@ export const Chatbot: React.FC<ChatbotProps> = ({
                             </div>
                         </div>
                         {msg.id === messages[messages.length - 1].id && msg.role === MessageRole.ASSISTANT && msg.quickReplies && msg.quickReplies.length > 0 && !isLoading && (
-                            <div className="flex flex-wrap gap-2 justify-start mt-3 ml-14">
+                            <div className="flex flex-wrap gap-2 justify-start mt-3 ml-0 sm:ml-14 max-w-full">
                                 {msg.quickReplies.map((reply, i) => (
                                     <button
                                         key={i}
                                         onClick={() => handleQuickReplyClick(reply)}
-                                        className="bg-card text-primary text-sm font-semibold py-2 px-4 rounded-full hover:bg-primary hover:text-primary-dark transition-colors border border-card-border/50"
+                                        className="bg-card text-primary text-xs sm:text-sm font-semibold py-2 px-3 sm:px-4 rounded-xl sm:rounded-full hover:bg-primary hover:text-primary-dark transition-colors border border-card-border/50 text-left max-w-full break-words"
                                     >
                                         {reply.title}
                                     </button>
@@ -333,9 +333,9 @@ export const Chatbot: React.FC<ChatbotProps> = ({
                 <div ref={messagesEndRef} />
             </div>
             
-            <div className="p-4 border-t border-card-border/20">
-                <div className="bg-card rounded-xl flex items-center p-2">
-                    <button onClick={() => fileInputRef.current?.click()} className="p-2 text-text-muted hover:text-text-main rounded-full transition-colors">
+            <div className="p-3 sm:p-4 border-t border-card-border/20">
+                <div className="bg-card rounded-xl flex items-center p-2 min-w-0">
+                    <button onClick={() => fileInputRef.current?.click()} className="p-2 text-text-muted hover:text-text-main rounded-full transition-colors flex-shrink-0">
                         <FileIcon/>
                     </button>
                     <input
@@ -351,10 +351,10 @@ export const Chatbot: React.FC<ChatbotProps> = ({
                         onChange={(e) => setInput(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && !isLoading && handleSendMessage(input)}
                         placeholder="Pregúntame sobre tu caso..."
-                        className="flex-1 bg-transparent px-4 text-text-main placeholder-text-muted focus:outline-none"
+                        className="flex-1 min-w-0 bg-transparent px-2 sm:px-4 text-sm sm:text-base text-text-main placeholder-text-muted focus:outline-none"
                         disabled={isLoading}
                     />
-                    <button onClick={() => handleSendMessage(input)} disabled={isLoading || !input.trim()} className="p-2 bg-primary text-primary-dark rounded-full disabled:opacity-50 transition-opacity">
+                    <button onClick={() => handleSendMessage(input)} disabled={isLoading || !input.trim()} className="p-2 bg-primary text-primary-dark rounded-full disabled:opacity-50 transition-opacity flex-shrink-0">
                         <SendIcon />
                     </button>
                 </div>
