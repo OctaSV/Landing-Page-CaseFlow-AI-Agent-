@@ -65,16 +65,30 @@ export const Chatbot: React.FC<ChatbotProps> = ({
     showExpandButton, onExpand, onDocumentUpload, onStartPhase2, onVariableAnalyzed,
     onIndemnificationStart, onIndemnificationStep, onIndemnificationEnd
 }) => {
-    // All logic remains unchanged
+    
     const [input, setInput] = useState('');
     const fileInputRef = useRef<HTMLInputElement>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const messagesContainerRef = useRef<HTMLDivElement>(null);
+    const isInitialMount = useRef(true);
 
-    const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
+        if (messagesContainerRef.current) {
+            messagesContainerRef.current.scrollTo({
+                top: messagesContainerRef.current.scrollHeight,
+                behavior
+            });
+        }
     };
 
-    useEffect(scrollToBottom, [messages]);
+    useEffect(() => {
+        // Evita el autoscroll al cargar la landing por primera vez
+        if (isInitialMount.current) {
+            isInitialMount.current = false;
+            return;
+        }
+        scrollToBottom('smooth');
+    }, [messages]);
 
     const handleSendMessage = useCallback(async (text: string, attachedFile?: File) => {
         if (!text && !attachedFile) return;
