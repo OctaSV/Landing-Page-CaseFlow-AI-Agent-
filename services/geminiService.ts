@@ -1,13 +1,15 @@
 import { GoogleGenAI, GenerateContentResponse, GroundingChunk, HarmCategory, HarmBlockThreshold } from "@google/genai";
 import { Message, MessageRole, GroundingSource } from '../types';
 
+// OBTENER LA CLAVE (Compatible con Vite y Vercel)
 const apiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
 
-if (!API_KEY) {
-    throw new Error("API_KEY environment variable not set.");
+if (!apiKey) {
+    console.warn("VITE_GEMINI_API_KEY environment variable not set.");
 }
 
-const ai = new GoogleGenAI({ apiKey: API_KEY });
+// INSTANCIAR EL CLIENTE USANDO 'apiKey'
+const ai = new GoogleGenAI({ apiKey });
 
 const modelConfig = {
     model: 'gemini-2.5-flash',
