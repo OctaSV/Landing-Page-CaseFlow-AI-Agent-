@@ -1,8 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
 
-const apiKey = process.env.GEMINI_API_KEY || '';
-const ai = new GoogleGenAI({ apiKey });
-
 const systemInstruction = `
 Rol y Configuración Base
 Identidad: Eres el Agente IA de CaseFlow, un asistente experto y empático especializado en guiar a personas que sufrieron accidentes de tránsito en Argentina. Tu objetivo principal es triple:
@@ -76,39 +73,64 @@ FASE 3: Veredicto y Armado de Expediente Digital
 `;
 
 const safetySettings = [
-    { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
-    { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
-    { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
-    { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
+  { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
+  { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
+  { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
+  { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
 ];
 
 export default async function handler(req: any, res: any) {
-    if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Método no permitido' });
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Método no permitido' });
+  }
+
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    console.error("Error: Falta la variable de entorno GEMINI_API_KEY");
+    return res.status(500).json({ error: "Falta configurar GEMINI_API_KEY en las variables de entorno." });
+  }
+
+  try {
+    const { history = [], newMessage = '', knowledgeBase = '' } = req.body;
+
+    const ai = new GoogleGenAI({ apiKey });
+
+    // Limpieza del historial para prevenir duplicidad del rol 'user' al final
+    const rawHistory = Array.isArray(history) ? history : [];
+    let previousHistory = rawHistory;
+
+    if (
+      previousHistory.length > 0 &&
+      (previousHistory[previousHistory.length - 1].role === 'USER' || previousHistory[previousHistory.length - 1].role === 'user') &&
+      previousHistory[previousHistory.length - 1].text === newMessage
+    ) {
+      previousHistory = previousHistory.slice(0, -1);
     }
 
-    try {
-        const { history, newMessage, knowledgeBase } = req.body;
+    const chatHistory = previousHistory.map((msg: any) => ({
+      role: msg.role === 'USER' || msg.role === 'user' ? 'user' : 'model',
+      parts: [{ text: msg.text || '' }]
+    }));
 
-        const chatHistory = (history || []).map((msg: any) => ({
-            role: msg.role === 'USER' || msg.role === 'user' ? 'user' : 'model',
-            parts: [{ text: msg.text }]
-        }));
+    const augmentedPrompt = `Utilizando ÚNICAMENTE la siguiente base de conocimiento, responde a la pregunta del usuario. No inventes información. Si la respuesta no se encuentra en la base de conocimiento, responde ÚNICA Y EXCLUSIVAMENTE con el texto "[KNOWLEDGE_BASE_FALLBACK]". No añadas ninguna otra palabra o explicación.\n\n--- INICIO BASE DE CONOCIMIENTO ---\n\n${knowledgeBase}\n\n--- FIN BASE DE CONOCIMIENTO ---\n\nPregunta del usuario: "${newMessage}"`;
 
-        const augmentedPrompt = `Utilizando ÚNICAMENTE la siguiente base de conocimiento, responde a la pregunta del usuario. No inventes información. Si la respuesta no se encuentra en la base de conocimiento, responde ÚNICA Y EXCLUSIVAMENTE con el texto "[KNOWLEDGE_BASE_FALLBACK]". No añadas ninguna otra palabra o explicación.\n\n--- INICIO BASE DE CONOCIMIENTO ---\n\n${knowledgeBase}\n\n--- FIN BASE DE CONOCIMIENTO ---\n\nPregunta del usuario: "${newMessage}"`;
+    const contents = [
+      ...chatHistory,
+      { role: 'user', parts: [{ text: augmentedPrompt }] }
+    ];
 
-        const response = await ai.models.generateContent({
-            model: 'gemini-3.6-flash',
-            contents: [...chatHistory, { role: 'user', parts: [{ text: augmentedPrompt }] }],
-            config: {
-                systemInstruction,
-                safetySettings,
-            }
-        });
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.6-flash',
+      contents,
+      config: {
+        systemInstruction,
+        safetySettings,
+      }
+    });
 
-        return res.status(200).json({ text: response.text });
-    } catch (error: any) {
-        console.error("Error en /api/chat:", error);
-        return res.status(500).json({ error: error.message || "Error interno del servidor" });
-    }
+    return res.status(200).json({ text: response.text || '' });
+  } catch (error: any) {
+    console.error("Error en /api/chat:", error);
+    return res.status(500).json({ error: error.message || "Error interno del servidor" });
+  }
 }
