@@ -1,4 +1,4 @@
-import { Message } from '../types';
+import { Message, GroundingSource } from '../types';
 
 export const generateChatResponse = async (
     history: Message[], 
@@ -56,5 +56,34 @@ export const generateChatResponse = async (
             analyzedVariable: null, 
             indemnificationEvent: null 
         };
+    }
+};
+
+export const generateGroundedResponse = async (prompt: string): Promise<{ text: string; sources: GroundingSource[] }> => {
+    try {
+        const response = await generateChatResponse([], prompt, '');
+        return { text: response.text, sources: [] };
+    } catch (error) {
+        console.error("Error en generateGroundedResponse:", error);
+        return { text: "Disculpe, ocurrió un error.", sources: [] };
+    }
+};
+
+export const generateMapsResponse = async (prompt: string, location: { latitude: number, longitude: number }): Promise<{ text: string; sources: GroundingSource[] }> => {
+    try {
+        const response = await generateChatResponse([], prompt, '');
+        return { text: response.text, sources: [] };
+    } catch (error) {
+        console.error("Error en generateMapsResponse:", error);
+        return { text: "Disculpe, ocurrió un error.", sources: [] };
+    }
+};
+
+export const analyzeImage = async (prompt: string, file: File): Promise<string> => {
+    try {
+        return "El análisis de documentos está deshabilitado en este momento.";
+    } catch (error) {
+        console.error("Error en analyzeImage:", error);
+        return "Disculpe, ocurrió un error al procesar la imagen.";
     }
 };
