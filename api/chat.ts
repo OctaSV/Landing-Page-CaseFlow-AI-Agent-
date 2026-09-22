@@ -20,6 +20,9 @@ Una pregunta por vez, esperando siempre la respuesta.
 Usa confirmaciones positivas: "Perfecto", "Muy bien", "Entiendo".
 Incluye indicadores de progreso: "Ya tenemos el 60% de la información".
 
+Manejo de Saludos e Información Incompleta:
+Si el usuario envía un saludo (ej: "Hola"), una opción corta, o un mensaje ambiguo que no contenga detalles del accidente o no esté explícitamente en la base de conocimiento, NUNCA respondas con códigos de error ni te detengas. Saluda con empatía e inicia el diálogo haciendo preguntas sencillas y progresivas (de a una por vez) hasta comprender exactamente qué le sucedió y cuál es su situación.
+
 Guía de Contenido Específico:
 Al recibir una pregunta sobre los primeros pasos a seguir tras un accidente (ej: "¿qué hago si choco?"), tu respuesta debe ser clara, concisa y estructurada en una lista de acciones inmediatas. Basa tu respuesta directamente en el Artículo 65 de la Ley de Tránsito, incluyendo siempre estos puntos:
 Detenerse de forma segura.
@@ -53,7 +56,7 @@ A (Aseguradora): Identificación y solvencia de la aseguradora del responsable
 C (Completitud): Nivel de documentación disponible
 E (Económica): Estimación del valor indemnizatorio potencial
 
-IMPORTANTE: Recopila esta información de forma conversacional y natural. No menciones explitamente estas variables al usuario. El sistema backend extraerá automáticamente estos datos del historial de conversación para calcular el scoring.
+IMPORTANTE: Recopila esta información de forma conversacional y natural. No menciones explícitamente estas variables al usuario. El sistema backend extraerá automáticamente estos datos del historial de conversación para calcular el scoring.
 
 Validación y Manejo de Datos
 Datos Inválidos o Imposibles
@@ -79,12 +82,10 @@ const safetySettings = [
   { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
 ];
 
-// Lista de modelos ordenada por preferencia
-const CANDIDATE_MODELS = [
-  'gemini-3.6-flash',
-  'gemini-2.0-flash',
-  'gemini-2.0-flash-lite'
-];
+// Modelos activos y estables de la serie Gemini 3
+const CANDIDATE_MODELS = ['gemini-3.6-flash', 'gemini-3.5-flash-lite'];
+
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {
@@ -104,6 +105,7 @@ export default async function handler(req: any, res: any) {
     const rawHistory = Array.isArray(history) ? history : [];
     let previousHistory = rawHistory;
 
+    // Limpieza para evitar enviar el mensaje del usuario dos veces seguidas en el historial
     if (
       previousHistory.length > 0 &&
       (previousHistory[previousHistory.length - 1].role === 'USER' || previousHistory[previousHistory.length - 1].role === 'user') &&
@@ -117,34 +119,44 @@ export default async function handler(req: any, res: any) {
       parts: [{ text: msg.text || '' }]
     }));
 
-    const augmentedPrompt = `Utilizando ÚNICAMENTE la siguiente base de conocimiento, responde a la pregunta del usuario. No inventes información. Si la respuesta no se encuentra en la base de conocimiento, responde ÚNICA Y EXCLUSIVAMENTE con el texto "[KNOWLEDGE_BASE_FALLBACK]". No añadas ninguna otra palabra o explicación.\n\n--- INICIO BASE DE CONOCIMIENTO ---\n\n${knowledgeBase}\n\n--- FIN BASE DE CONOCIMIENTO ---\n\nPregunta del usuario: "${newMessage}"`;
+    // Construcción del Prompt: Se instruye explícitamente a mantener el flujo de diálogo si el usuario saluda o no aporta detalles
+    let userPrompt = newMessage;
+    if (knowledgeBase && knowledgeBase.trim().length > 0) {
+      userPrompt = `Usa la siguiente base de conocimiento como referencia para tus respuestas:\n\n--- INICIO BASE DE CONOCIMIENTO ---\n${knowledgeBase}\n--- FIN BASE DE CONOCIMIENTO ---\n\nInstrucciones adicionales para la respuesta:
+1. Si el usuario te saluda, te responde de forma breve o te plantea una duda general sobre un accidente, mantén tu rol de Cassey: saluda empáticamente y hazle preguntas una a una para ir entendiendo su situación.
+2. Si el usuario realiza una pregunta técnica o normativa puntual y la respuesta NO se encuentra en la base de conocimiento ni en tus leyes de referencia, responde estrictamente "[KNOWLEDGE_BASE_FALLBACK]".
+
+Mensaje del usuario: "${newMessage}"`;
+    }
 
     const contents = [
       ...chatHistory,
-      { role: 'user', parts: [{ text: augmentedPrompt }] }
+      { role: 'user', parts: [{ text: userPrompt }] }
     ];
 
     let response = null;
     let lastError = null;
 
-    // Bucle de intento con fallback
+    // Reintentos automáticos y fallback entre modelos de la API
     for (const modelName of CANDIDATE_MODELS) {
-      try {
-        response = await ai.models.generateContent({
-          model: modelName,
-          contents,
-          config: {
-            systemInstruction,
-            safetySettings,
-          }
-        });
-        if (response?.text) {
-          break; // Si el modelo respondió con éxito, salimos del bucle
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+          response = await ai.models.generateContent({
+            model: modelName,
+            contents,
+            config: {
+              systemInstruction,
+              safetySettings,
+            }
+          });
+          if (response?.text) break;
+        } catch (err: any) {
+          lastError = err;
+          console.warn(`Intento ${attempt} con ${modelName} falló: ${err.message || err}`);
+          if (attempt === 1) await delay(1000);
         }
-      } catch (err: any) {
-        console.warn(`El modelo ${modelName} falló con error (${err.message || err}). Intentando siguiente fallback...`);
-        lastError = err;
       }
+      if (response?.text) break;
     }
 
     if (!response || !response.text) {
@@ -153,7 +165,7 @@ export default async function handler(req: any, res: any) {
 
     return res.status(200).json({ text: response.text });
   } catch (error: any) {
-    console.error("Error en /api/chat tras intentar fallbacks:", error);
+    console.error("Error en /api/chat:", error);
     return res.status(500).json({ error: error.message || "Error interno del servidor" });
   }
 }
