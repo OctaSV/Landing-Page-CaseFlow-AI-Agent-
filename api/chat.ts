@@ -1,6 +1,12 @@
-import { GoogleGenAI, HarmCategory, HarmBlockThreshold } from "@google/genai";
+import { GoogleGenAI, HarmCategory, HarmBlockThreshold, ThinkingLevel } from "@google/genai";
+// La base de conocimiento vive SOLO en el servidor: no viaja desde el navegador en cada mensaje.
+// Extensión .js: requerida por Node ESM ("type": "module") en las funciones de Vercel.
+import { leyDeTransitoText } from "../knowledge/leyDeTransito.js";
+import { leyDeSegurosText } from "../knowledge/leyDeSeguros.js";
+import { baremoMedicoText } from "../knowledge/baremoMedico.js";
+import { falloDanosText } from "../knowledge/falloDanos.js";
 
-const systemInstruction = `
+const baseInstruction = `
 Rol y Configuración Base
 Identidad: Eres el Agente IA de CaseFlow, un asistente experto y empático especializado en guiar a personas que sufrieron accidentes de tránsito en Argentina. Tu objetivo principal es triple:
 
@@ -75,6 +81,23 @@ FASE 2: Guía para Armado de Caso (Modo Guía)
 FASE 3: Veredicto y Armado de Expediente Digital
 `;
 
+// Prefijo ESTABLE (idéntico en cada request): instrucciones + base de conocimiento.
+// Al ir primero y no cambiar, Gemini puede reutilizarlo vía caché implícita
+// en lugar de reprocesar ~110k tokens en cada turno.
+const knowledgeInstruction = `${baseInstruction}
+
+--- INICIO BASE DE CONOCIMIENTO ---
+${leyDeTransitoText}
+${leyDeSegurosText}
+${baremoMedicoText}
+${falloDanosText}
+--- FIN BASE DE CONOCIMIENTO ---
+
+Instrucciones adicionales para la respuesta:
+1. Si el usuario te saluda, te responde de forma breve o te plantea una duda general sobre un accidente, mantén tu rol de Cassey: saluda empáticamente y hazle preguntas una a una para ir entendiendo su situación.
+2. Si el usuario realiza una pregunta técnica o normativa puntual y la respuesta NO se encuentra en la base de conocimiento ni en tus leyes de referencia, responde estrictamente "[KNOWLEDGE_BASE_FALLBACK]".
+`;
+
 const safetySettings = [
   { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
   { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
@@ -86,6 +109,13 @@ const safetySettings = [
 const CANDIDATE_MODELS = ['gemini-3.6-flash', 'gemini-3.5-flash-lite'];
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Solo vale la pena reintentar errores transitorios (sobrecarga / rate limit).
+// Un 400/403/404 no se arregla esperando: se pasa directo al modelo siguiente.
+const isRetryable = (err: any) => {
+  const status = err?.status ?? err?.code;
+  return status === 429 || status === 500 || status === 503;
+};
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {
@@ -99,7 +129,7 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    const { history = [], newMessage = '', knowledgeBase = '' } = req.body;
+    const { history = [], newMessage = '', useKnowledgeBase = true } = req.body;
     const ai = new GoogleGenAI({ apiKey });
 
     const rawHistory = Array.isArray(history) ? history : [];
@@ -119,18 +149,12 @@ export default async function handler(req: any, res: any) {
       parts: [{ text: msg.text || '' }]
     }));
 
-    let userPrompt = newMessage;
-    if (knowledgeBase && knowledgeBase.trim().length > 0) {
-      userPrompt = `Usa la siguiente base de conocimiento como referencia para tus respuestas:\n\n--- INICIO BASE DE CONOCIMIENTO ---\n${knowledgeBase}\n--- FIN BASE DE CONOCIMIENTO ---\n\nInstrucciones adicionales para la respuesta:
-1. Si el usuario te saluda, te responde de forma breve o te plantea una duda general sobre un accidente, mantén tu rol de Cassey: saluda empáticamente y hazle preguntas una a una para ir entendiendo su situación.
-2. Si el usuario realiza una pregunta técnica o normativa puntual y la respuesta NO se encuentra en la base de conocimiento ni en tus leyes de referencia, responde strictly "[KNOWLEDGE_BASE_FALLBACK]".
-
-Mensaje del usuario: "${newMessage}"`;
-    }
+    // El mensaje del usuario va solo; la base de conocimiento ya está en systemInstruction.
+    const systemInstruction = useKnowledgeBase ? knowledgeInstruction : baseInstruction;
 
     const contents = [
       ...chatHistory,
-      { role: 'user', parts: [{ text: userPrompt }] }
+      { role: 'user', parts: [{ text: newMessage }] }
     ];
 
     let response = null;
@@ -145,13 +169,20 @@ Mensaje del usuario: "${newMessage}"`;
             config: {
               systemInstruction,
               safetySettings,
+              // Gemini 3.x razona ("thinking") antes de responder; para un chat
+              // conversacional el nivel bajo reduce mucho la latencia.
+              thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
             }
           });
           if (response?.text) break;
         } catch (err: any) {
           lastError = err;
           console.warn(`Intento ${attempt} con ${modelName} falló: ${err.message || err}`);
-          if (attempt === 1) await delay(1000);
+          if (attempt === 1 && isRetryable(err)) {
+            await delay(500);
+          } else {
+            break; // error no transitorio: no reintentar el mismo modelo
+          }
         }
       }
       if (response?.text) break;
